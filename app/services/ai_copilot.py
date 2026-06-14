@@ -98,7 +98,7 @@ Answer the user's question based strictly on the data above. Be concise, actiona
         )
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
         response = model.generate_content(f"{system_prompt}\n\nUser question: {user_question}")
         return response.text.strip()
     except Exception as e:
