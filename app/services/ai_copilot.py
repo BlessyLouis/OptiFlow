@@ -103,4 +103,11 @@ Answer the user's question based strictly on the data above. Be concise, actiona
         return response.text.strip()
     except Exception as e:
         logger.error("Copilot query failed: %s", e)
+        if "429" in str(e) or "quota" in str(e).lower():
+            return (
+                "⚠️ Gemini API free tier quota reached for today. "
+                "The quota resets every 24 hours. All other features "
+                "(orders, inventory, analytics) continue to work normally. "
+                "To remove this limit, add billing at https://ai.dev/rate-limit"
+            )
         return f"The AI copilot encountered an error: {str(e)}. Please try again."

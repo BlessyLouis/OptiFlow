@@ -47,7 +47,7 @@ def action_center():
 
     # Pre-generate explanations for the top 10 to keep page load reasonable
     enriched = []
-    for order in high_risk_orders[:10]:
+    for order in high_risk_orders[:3]:
         explanation = generate_order_explanation(order)
         enriched.append({"order": order, "explanation": explanation})
 
