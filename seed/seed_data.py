@@ -91,8 +91,8 @@ def seed_inventory():
 
 def seed_orders():
     print("Seeding orders...")
-    Order.query.delete()
     OrderHistory.query.delete()
+    Order.query.delete()
 
     # Pre-load inventory to use for cross-referencing
     inv_items = Inventory.query.all()
