@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Orders{% endblock %}
+{% block page_title %}Orders{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-heading">Order Management</h1>
+    <p class="page-subheading">{{ orders.total }} orders total</p>
+  </div>
+  <a href="{{ url_for('orders.create_order') }}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>New Order
+  </a>
+</div>
+
+<!-- Filters -->
+<div class="filter-bar mb-4">
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+    <select name="status" class="filter-select">
+      <option value="">All Statuses</option>
+      {% for s in order_statuses %}
+      <option value="{{ s }}" {% if active_filters.status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <select name="store" class="filter-select">
+      <option value="">All Stores</option>
+      {% for s in store_locations %}
+      <option value="{{ s }}" {% if active_filters.store == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <select name="lens_type" class="filter-select">
+      <option value="">All Lens Types</option>
+      {% for lt in lens_types %}
+      <option value="{{ lt }}" {% if active_filters.lens_type == lt %}selected{% endif %}>{{ lt }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+    {% if active_filters.status or active_filters.store or active_filters.lens_type %}
+    <a href="{{ url_for('orders.list_orders') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card-panel">
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Order ID</th>
+          <th>Customer</th>
+          <th>Store</th>
+          <th>Lens</th>
+          <th>Status</th>
+          <th>Risk</th>
+          <th>SLA Remaining</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in orders.items %}
+        <tr class="{% if order.risk_score >= 71 %}row-high-risk{% elif order.risk_score >= 41 %}row-med-risk{% endif %}">
+          <td>
+            <a href="{{ url_for('orders.order_detail', order_id=order.order_id) }}" class="order-link">
+              {{ order.order_id }}
+            </a>
+          </td>
+          <td class="fw-medium">{{ order.customer_name }}</td>
+          <td class="text-muted small">{{ order.store_location }}</td>
+          <td>
+            <span class="lens-tag">{{ order.lens_type }}</span>
+            <div class="text-muted" style="font-size:0.7rem;">{{ order.prescription_power }} · {{ order.coating }}</div>
+          </td>
+          <td><span class="status-badge status-{{ order.current_status | lower | replace(' ', '-') }}">{{ order.current_status }}</span></td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <span class="{{ order.risk_badge_class }}">{{ order.risk_score }}%</span>
+            </div>
+          </td>
+          <td>
+            {% if order.sla_remaining_hours is not none %}
+              {% if order.sla_remaining_hours < 0 %}
+                <span class="text-danger fw-medium"><i class="bi bi-alarm-fill me-1"></i>Overdue</span>
+              {% elif order.sla_remaining_hours < 12 %}
+                <span class="text-warning fw-medium">{{ order.sla_remaining_hours }}h</span>
+              {% else %}
+                {{ order.sla_remaining_hours }}h
+              {% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-muted small">{{ order.created_at.strftime('%d %b') }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" class="empty-state">No orders match the current filters.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if orders.pages > 1 %}
+  <div class="pagination-bar">
+    <span class="text-muted small">
+      Showing {{ ((orders.page - 1) * orders.per_page) + 1 }}–{{ [orders.page * orders.per_page, orders.total] | min }} of {{ orders.total }}
+    </span>
+    <div class="d-flex gap-1">
+      {% if orders.has_prev %}
+      <a href="?page={{ orders.prev_num }}&status={{ active_filters.status }}&store={{ active_filters.store }}&lens_type={{ active_filters.lens_type }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      {% endif %}
+      {% for p in orders.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if p %}
+          <a href="?page={{ p }}&status={{ active_filters.status }}&store={{ active_filters.store }}&lens_type={{ active_filters.lens_type }}"
+             class="btn btn-sm {% if p == orders.page %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ p }}</a>
+        {% else %}
+          <span class="btn btn-sm btn-outline-secondary disabled">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if orders.has_next %}
+      <a href="?page={{ orders.next_num }}&status={{ active_filters.status }}&store={{ active_filters.store }}&lens_type={{ active_filters.lens_type }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-heading">Operations Overview</h1>
+    <p class="page-subheading">Live view of order pipeline and inventory health</p>
+  </div>
+  <div class="page-header-meta">
+    <span class="text-muted small"><i class="bi bi-clock me-1"></i>Last updated {{ now.strftime('%H:%M UTC') }}</span>
+  </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-4 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-blue"><i class="bi bi-receipt-cutoff"></i></div>
+      <div class="kpi-value">{{ active_count }}</div>
+      <div class="kpi-label">Active Orders</div>
+      <div class="kpi-trend">
+        <i class="bi bi-arrow-up-right text-success"></i> In pipeline
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-green"><i class="bi bi-check2-circle"></i></div>
+      <div class="kpi-value">{{ delivered_count }}</div>
+      <div class="kpi-label">Delivered</div>
+      <div class="kpi-trend text-success">Fulfilled</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card kpi-card-warn">
+      <div class="kpi-icon kpi-yellow"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="kpi-value">{{ at_risk_count }}</div>
+      <div class="kpi-label">At Risk</div>
+      <div class="kpi-trend text-warning">Risk ≥ 71%</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card kpi-card-danger">
+      <div class="kpi-icon kpi-red"><i class="bi bi-alarm"></i></div>
+      <div class="kpi-value">{{ sla_breach_count }}</div>
+      <div class="kpi-label">SLA Breaches</div>
+      <div class="kpi-trend text-danger">Overdue</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- High Risk Orders Table -->
+  <div class="col-lg-8">
+    <div class="card-panel">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>High Risk Orders</span>
+        <a href="{{ url_for('ai.action_center') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Customer</th>
+              <th>Lens Type</th>
+              <th>Status</th>
+              <th>Risk</th>
+              <th>SLA Remaining</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in high_risk_orders %}
+            <tr>
+              <td>
+                <a href="{{ url_for('orders.order_detail', order_id=order.order_id) }}" class="order-link">
+                  {{ order.order_id }}
+                </a>
+              </td>
+              <td>{{ order.customer_name }}</td>
+              <td><span class="lens-tag">{{ order.lens_type }}</span></td>
+              <td><span class="status-badge status-{{ order.current_status | lower | replace(' ', '-') }}">{{ order.current_status }}</span></td>
+              <td>
+                <div class="risk-cell">
+                  <span class="{{ order.risk_badge_class }}">{{ order.risk_score }}%</span>
+                  <div class="risk-bar">
+                    <div class="risk-bar-fill risk-{{ order.risk_label | lower }}" style="width: {{ order.risk_score }}%"></div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                {% if order.sla_remaining_hours is not none %}
+                  {% if order.sla_remaining_hours < 0 %}
+                    <span class="text-danger fw-medium">Overdue</span>
+                  {% else %}
+                    <span class="{% if order.sla_remaining_hours < 12 %}text-warning{% endif %}">
+                      {{ order.sla_remaining_hours }}h
+                    </span>
+                  {% endif %}
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="empty-state">No high-risk orders. All clear.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Side column -->
+  <div class="col-lg-4">
+    <!-- Status Distribution -->
+    <div class="card-panel mb-4">
+      <div class="panel-header">
+        <span class="panel-title">Order Status</span>
+      </div>
+      <canvas id="statusChart" height="200"></canvas>
+    </div>
+
+    <!-- Low Stock Alerts -->
+    <div class="card-panel">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-box-seam text-warning me-2"></i>Low Stock Alerts</span>
+        <a href="{{ url_for('inventory.list_inventory') }}?status=low_stock" class="btn btn-sm btn-outline-secondary">View</a>
+      </div>
+      {% for item in low_stock_items %}
+      <div class="inventory-alert-row">
+        <div>
+          <div class="fw-medium small">{{ item.lens_type }} {{ item.lens_power }}</div>
+          <div class="text-muted" style="font-size:0.75rem;">{{ item.coating }} · {{ item.lens_index }}</div>
+        </div>
+        <span class="qty-badge {% if item.quantity_available <= 5 %}qty-critical{% else %}qty-low{% endif %}">
+          {{ item.quantity_available }} left
+        </span>
+      </div>
+      {% else %}
+      <div class="empty-state">Stock levels healthy</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Recent Orders -->
+<div class="card-panel mt-4">
+  <div class="panel-header">
+    <span class="panel-title">Recent Orders</span>
+    <a href="{{ url_for('orders.list_orders') }}" class="btn btn-sm btn-outline-secondary">All Orders</a>
+  </div>
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Order ID</th>
+          <th>Customer</th>
+          <th>Store</th>
+          <th>Lens Type</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in recent_orders %}
+        <tr>
+          <td><a href="{{ url_for('orders.order_detail', order_id=order.order_id) }}" class="order-link">{{ order.order_id }}</a></td>
+          <td>{{ order.customer_name }}</td>
+          <td class="text-muted small">{{ order.store_location }}</td>
+          <td><span class="lens-tag">{{ order.lens_type }}</span></td>
+          <td><span class="status-badge status-{{ order.current_status | lower | replace(' ', '-') }}">{{ order.current_status }}</span></td>
+          <td class="text-muted small">{{ order.created_at.strftime('%d %b, %H:%M') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const statusData = {{ status_chart | tojson }};
+const ctx = document.getElementById('statusChart').getContext('2d');
+
+const labels = Object.keys(statusData);
+const values = Object.values(statusData);
+const palette = ['#6366f1','#22c55e','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#10b981','#f97316','#ec4899'];
+
+new Chart(ctx, {
+  type: 'doughnut',
+  data: {
+    labels,
+    datasets: [{ data: values, backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 10 } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` } }
+    },
+    cutout: '65%'
+  }
+});
+</script>
+{% endblock %}

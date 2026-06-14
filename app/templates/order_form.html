@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}New Order{% endblock %}
+{% block page_title %}New Order{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('orders.list_orders') }}" class="back-link"><i class="bi bi-arrow-left me-1"></i>Orders</a>
+    <h1 class="page-heading mt-1">Create Order</h1>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card-panel">
+      <form method="post" action="{{ url_for('orders.create_order') }}">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label small fw-medium">Customer Name <span class="text-danger">*</span></label>
+            <input type="text" name="customer_name" class="form-control" required placeholder="Arjun Sharma" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-medium">Store Location <span class="text-danger">*</span></label>
+            <select name="store_location" class="form-select" required>
+              <option value="">Select store…</option>
+              {% for s in store_locations %}
+              <option value="{{ s }}">{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-medium">Lens Type <span class="text-danger">*</span></label>
+            <select name="lens_type" class="form-select" required>
+              <option value="">Select lens type…</option>
+              {% for lt in lens_types %}
+              <option value="{{ lt }}">{{ lt }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-medium">Prescription Power <span class="text-danger">*</span></label>
+            <input type="text" name="prescription_power" class="form-control" required placeholder="-2.50" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-medium">Lens Index <span class="text-danger">*</span></label>
+            <select name="lens_index" class="form-select" required>
+              {% for idx in lens_indexes %}
+              <option value="{{ idx }}">{{ idx }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-medium">Coating <span class="text-danger">*</span></label>
+            <select name="coating" class="form-select" required>
+              {% for c in coatings %}
+              <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-medium">Frame Name</label>
+            <input type="text" name="frame_name" class="form-control" placeholder="Ray-Ban RB3025 (optional)" />
+          </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Create Order</button>
+          <a href="{{ url_for('orders.list_orders') }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

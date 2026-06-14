@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-heading">Analytics</h1>
+    <p class="page-subheading">Order pipeline performance and operational trends</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Orders by Status -->
+  <div class="col-lg-5">
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">Orders by Status</span></div>
+      <canvas id="statusChart" height="260"></canvas>
+    </div>
+  </div>
+
+  <!-- SLA Compliance -->
+  <div class="col-lg-7">
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">SLA Compliance</span></div>
+      <canvas id="slaChart" height="260"></canvas>
+    </div>
+  </div>
+
+  <!-- Breach Trend -->
+  <div class="col-lg-7">
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">High-Risk Order Trend — Last 7 Days</span></div>
+      <canvas id="breachTrendChart" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- Inventory by Lens Type -->
+  <div class="col-lg-5">
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">Orders by Lens Type</span></div>
+      <canvas id="lensTypeChart" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- Store Performance -->
+  <div class="col-lg-6">
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">Avg Risk Score by Store</span></div>
+      <canvas id="storeRiskChart" height="260"></canvas>
+    </div>
+  </div>
+
+  <!-- QC Failure Trend -->
+  <div class="col-lg-6">
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">QC Failure Trend — Last 30 Days</span></div>
+      <canvas id="qcTrendChart" height="260"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const palette = ['#6366f1','#22c55e','#f59e0b','#ef4444','#3b82f6','#8b5cf6','#10b981','#f97316','#ec4899','#06b6d4'];
+
+async function loadCharts() {
+  const resp = await fetch('/analytics/api/summary');
+  const d = await resp.json();
+
+  // Orders by Status — doughnut
+  new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(d.status_counts),
+      datasets: [{ data: Object.values(d.status_counts), backgroundColor: palette, borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 10 } } }, cutout: '60%' }
+  });
+
+  // SLA Compliance — bar
+  new Chart(document.getElementById('slaChart'), {
+    type: 'bar',
+    data: {
+      labels: ['On Time', 'At Risk / Breach'],
+      datasets: [{ data: [d.sla.on_time, d.sla.breach], backgroundColor: ['#22c55e', '#ef4444'], borderRadius: 6, borderWidth: 0 }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} orders` } } },
+      scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } }
+    }
+  });
+
+  // Breach Trend — line
+  new Chart(document.getElementById('breachTrendChart'), {
+    type: 'line',
+    data: {
+      labels: d.breach_trend.map(r => r.date),
+      datasets: [{
+        label: 'High-Risk Orders',
+        data: d.breach_trend.map(r => r.count),
+        borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)',
+        fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#ef4444'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } }
+    }
+  });
+
+  // Lens Type — horizontal bar
+  new Chart(document.getElementById('lensTypeChart'), {
+    type: 'bar',
+    data: {
+      labels: d.inventory_by_lens.map(r => r.lens_type),
+      datasets: [{ data: d.inventory_by_lens.map(r => r.orders), backgroundColor: palette, borderRadius: 4, borderWidth: 0 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, grid: { color: '#f1f5f9' } }, y: { grid: { display: false } } }
+    }
+  });
+
+  // Store Risk — horizontal bar
+  new Chart(document.getElementById('storeRiskChart'), {
+    type: 'bar',
+    data: {
+      labels: d.store_risk.map(r => r.store.split(' - ')[1] || r.store),
+      datasets: [{
+        data: d.store_risk.map(r => r.avg_risk),
+        backgroundColor: d.store_risk.map(r => r.avg_risk >= 71 ? '#ef4444' : r.avg_risk >= 41 ? '#f59e0b' : '#22c55e'),
+        borderRadius: 4, borderWidth: 0
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` Avg risk: ${ctx.parsed.x}%` } } },
+      scales: { x: { beginAtZero: true, max: 100, grid: { color: '#f1f5f9' } }, y: { grid: { display: false } } }
+    }
+  });
+
+  // QC Trend — line
+  new Chart(document.getElementById('qcTrendChart'), {
+    type: 'bar',
+    data: {
+      labels: d.qc_trend.map(r => r.date),
+      datasets: [{
+        label: 'QC Failures',
+        data: d.qc_trend.map(r => r.failures),
+        backgroundColor: '#f59e0b', borderRadius: 3, borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } } }
+    }
+  });
+}
+
+loadCharts().catch(console.error);
+</script>
+{% endblock %}

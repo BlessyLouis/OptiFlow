@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Inventory{% endblock %}
+{% block page_title %}Inventory{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-heading">Lens Inventory</h1>
+    <p class="page-subheading">{{ items | length }} SKUs tracked</p>
+  </div>
+  <a href="{{ url_for('inventory.forecast') }}" class="btn btn-outline-primary btn-sm">
+    <i class="bi bi-graph-up me-1"></i>Forecast
+  </a>
+</div>
+
+<!-- Alert banners -->
+{% if out_count > 0 %}
+<div class="alert-banner alert-banner-danger mb-3">
+  <i class="bi bi-x-circle-fill me-2"></i>
+  <strong>{{ out_count }} SKU(s) are out of stock.</strong> Incoming orders for these lenses will be flagged as high risk.
+</div>
+{% endif %}
+{% if low_count > 0 %}
+<div class="alert-banner alert-banner-warning mb-4">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  <strong>{{ low_count }} SKU(s) are below reorder threshold.</strong> Consider restocking soon.
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div class="filter-bar mb-4">
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+    <select name="status" class="filter-select">
+      <option value="">All Stock Status</option>
+      <option value="low_stock" {% if active_filters.status == 'low_stock' %}selected{% endif %}>Low Stock</option>
+      <option value="out_of_stock" {% if active_filters.status == 'out_of_stock' %}selected{% endif %}>Out of Stock</option>
+    </select>
+    <select name="lens_type" class="filter-select">
+      <option value="">All Lens Types</option>
+      {% for lt in lens_types %}
+      <option value="{{ lt }}" {% if active_filters.lens_type == lt %}selected{% endif %}>{{ lt }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+    {% if active_filters.status or active_filters.lens_type %}
+    <a href="{{ url_for('inventory.list_inventory') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card-panel">
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Lens Type</th>
+          <th>Power</th>
+          <th>Coating</th>
+          <th>Index</th>
+          <th>Qty Available</th>
+          <th>Reorder At</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr class="{% if item.stock_status == 'out_of_stock' %}row-danger{% elif item.stock_status == 'low_stock' %}row-warn{% endif %}">
+          <td><span class="lens-tag">{{ item.lens_type }}</span></td>
+          <td><code>{{ item.lens_power }}</code></td>
+          <td>{{ item.coating }}</td>
+          <td>{{ item.lens_index }}</td>
+          <td class="fw-medium {% if item.quantity_available <= 5 %}text-danger{% elif item.quantity_available <= 20 %}text-warning{% endif %}">
+            {{ item.quantity_available }}
+          </td>
+          <td class="text-muted">{{ item.reorder_threshold }}</td>
+          <td>
+            <span class="stock-badge stock-{{ item.stock_status }}">{{ item.stock_status_label }}</span>
+          </td>
+          <td>
+            <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#restockModal{{ item.id }}">
+              Restock
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="empty-state">No inventory items match the current filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Restock Modals -->
+{% for item in items %}
+<div class="modal fade" id="restockModal{{ item.id }}" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">Restock: {{ item.lens_type }} {{ item.lens_power }}</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{{ url_for('inventory.restock', inventory_id=item.id) }}">
+        <div class="modal-body">
+          <p class="text-muted small">Current stock: <strong>{{ item.quantity_available }}</strong> units</p>
+          <label class="form-label small fw-medium">Add Units</label>
+          <input type="number" name="quantity" class="form-control form-control-sm" min="1" max="500" required placeholder="50" />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-primary">Confirm Restock</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

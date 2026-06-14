@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}{{ order.order_id }}{% endblock %}
+{% block page_title %}Order {{ order.order_id }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('orders.list_orders') }}" class="back-link"><i class="bi bi-arrow-left me-1"></i>Orders</a>
+    <h1 class="page-heading mt-1">{{ order.order_id }}</h1>
+    <p class="page-subheading">{{ order.customer_name }} · {{ order.store_location }}</p>
+  </div>
+  <div class="d-flex gap-2 align-items-start">
+    <span class="{{ order.risk_badge_class }} badge-lg">Risk {{ order.risk_score }}%</span>
+    <span class="status-badge status-{{ order.current_status | lower | replace(' ', '-') }} badge-lg">
+      {{ order.current_status }}
+    </span>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Order details -->
+  <div class="col-lg-5">
+    <div class="card-panel mb-4">
+      <div class="panel-header"><span class="panel-title">Order Details</span></div>
+      <dl class="detail-list">
+        <dt>Customer</dt><dd>{{ order.customer_name }}</dd>
+        <dt>Store</dt><dd>{{ order.store_location }}</dd>
+        <dt>Lens Type</dt><dd><span class="lens-tag">{{ order.lens_type }}</span></dd>
+        <dt>Prescription</dt><dd><code>{{ order.prescription_power }}</code></dd>
+        <dt>Lens Index</dt><dd>{{ order.lens_index }}</dd>
+        <dt>Coating</dt><dd>{{ order.coating }}</dd>
+        <dt>Frame</dt><dd>{{ order.frame_name or '—' }}</dd>
+        <dt>SLA</dt><dd>{{ order.sla_hours }} hours</dd>
+        <dt>Expected Delivery</dt>
+        <dd>
+          {% if order.expected_delivery %}
+            {{ order.expected_delivery.strftime('%d %b %Y, %H:%M') }}
+            {% if order.sla_remaining_hours is not none %}
+              {% if order.sla_remaining_hours < 0 %}
+                <span class="ms-2 text-danger small">(Overdue by {{ (order.sla_remaining_hours * -1) | round(1) }}h)</span>
+              {% else %}
+                <span class="ms-2 text-muted small">({{ order.sla_remaining_hours }}h remaining)</span>
+              {% endif %}
+            {% endif %}
+          {% else %}—{% endif %}
+        </dd>
+        <dt>Inventory Available</dt>
+        <dd>
+          {% if order.inventory_available %}
+            <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>In Stock</span>
+          {% else %}
+            <span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>Unavailable</span>
+          {% endif %}
+        </dd>
+        <dt>QC Failures</dt><dd>{{ order.qc_failure_count }}</dd>
+        {% if order.delay_reason %}
+        <dt>Delay Reason</dt><dd class="text-danger">{{ order.delay_reason }}</dd>
+        {% endif %}
+        <dt>Created</dt><dd>{{ order.created_at.strftime('%d %b %Y, %H:%M') }}</dd>
+      </dl>
+    </div>
+
+    <!-- Advance Status -->
+    {% if order.is_active %}
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">Advance Status</span></div>
+      <form method="post" action="{{ url_for('orders.advance_status', order_id=order.order_id) }}">
+        <div class="mb-3">
+          <label class="form-label small fw-medium">New Status</label>
+          <select name="new_status" class="form-select form-select-sm" required>
+            <option value="">Select status…</option>
+            {% for s in ["Prescription Verified", "Lens Processing", "QC", "QC Failed", "Reorder Generated", "Packing", "Shipped", "Delivered", "Cancelled"] %}
+            {% if s != order.current_status %}
+            <option value="{{ s }}">{{ s }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-medium">Remarks (optional)</label>
+          <input type="text" name="remarks" class="form-control form-control-sm" placeholder="e.g. QC passed — power within tolerance" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Update Status</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Timeline + AI -->
+  <div class="col-lg-7">
+    <!-- AI Explanation (loads async) -->
+    {% if order.risk_score >= 71 %}
+    <div class="card-panel ai-panel mb-4" id="aiExplanationPanel">
+      <div class="panel-header">
+        <span class="panel-title"><i class="bi bi-robot me-2"></i>AI Risk Analysis</span>
+        <span class="badge bg-danger text-white">High Risk</span>
+      </div>
+      <div id="aiContent">
+        <div class="ai-loading"><i class="bi bi-arrow-repeat spin me-2"></i>Generating analysis…</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Order History Timeline -->
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">Order Timeline</span></div>
+      <div class="timeline">
+        {% for event in history %}
+        <div class="timeline-item">
+          <div class="timeline-dot status-dot-{{ event.status | lower | replace(' ', '-') }}"></div>
+          <div class="timeline-body">
+            <div class="timeline-status">{{ event.status }}</div>
+            <div class="timeline-remark">{{ event.remarks or '' }}</div>
+            <div class="timeline-time">{{ event.timestamp.strftime('%d %b %Y, %H:%M') }}</div>
+          </div>
+        </div>
+        {% else %}
+        <div class="empty-state">No history recorded.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if order.risk_score >= 71 %}
+<script>
+(async () => {
+  try {
+    const resp = await fetch('/ai/explain/{{ order.order_id }}');
+    const data = await resp.json();
+    document.getElementById('aiContent').innerHTML = `
+      <div class="ai-field">
+        <div class="ai-field-label">Why it's at risk</div>
+        <div class="ai-field-value">${data.reason || '—'}</div>
+      </div>
+      <div class="ai-field mt-3">
+        <div class="ai-field-label">Recommended action</div>
+        <div class="ai-field-value text-primary fw-medium">${data.recommended_action || '—'}</div>
+      </div>
+      <div class="ai-field mt-3">
+        <div class="ai-field-label">Expected impact</div>
+        <div class="ai-field-value">${data.expected_impact || '—'}</div>
+      </div>
+    `;
+  } catch (e) {
+    document.getElementById('aiContent').innerHTML = '<div class="text-muted small">AI analysis unavailable.</div>';
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

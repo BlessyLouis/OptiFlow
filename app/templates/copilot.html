@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}AI Copilot{% endblock %}
+{% block page_title %}AI Copilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-heading">Operations Copilot</h1>
+    <p class="page-subheading">Ask anything about your order pipeline, inventory, or SLA performance</p>
+  </div>
+  <span class="badge bg-primary px-3 py-2" style="font-size:0.78rem;">Powered by Gemini</span>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <!-- Suggested queries -->
+    <div class="copilot-suggestions mb-4">
+      {% for query in suggested_queries %}
+      <button class="suggestion-chip" onclick="askQuery(this.textContent.trim())">{{ query }}</button>
+      {% endfor %}
+    </div>
+
+    <!-- Chat window -->
+    <div class="copilot-window" id="chatWindow">
+      <div class="copilot-welcome">
+        <div class="copilot-avatar"><i class="bi bi-robot"></i></div>
+        <div class="copilot-welcome-text">
+          <strong>OptiFlow Copilot</strong><br/>
+          <span class="text-muted small">I have access to your live order data. Ask me anything about pipeline status, SLA risks, inventory, or store performance.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="copilot-input-bar mt-3">
+      <input
+        type="text"
+        class="copilot-input"
+        id="copilotInput"
+        placeholder="e.g. Which orders are likely to breach SLA this week?"
+        autocomplete="off"
+        onkeydown="if(event.key==='Enter') sendQuery()"
+      />
+      <button class="copilot-send-btn" id="sendBtn" onclick="sendQuery()">
+        <i class="bi bi-send-fill"></i>
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chatWindow = document.getElementById('chatWindow');
+const input = document.getElementById('copilotInput');
+const sendBtn = document.getElementById('sendBtn');
+
+function appendMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = `copilot-message copilot-${role}`;
+  div.innerHTML = `
+    <div class="message-bubble">${text.replace(/\n/g, '<br/>')}</div>
+    <div class="message-time">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>
+  `;
+  chatWindow.appendChild(div);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function appendTyping() {
+  const div = document.createElement('div');
+  div.className = 'copilot-message copilot-assistant';
+  div.id = 'typingIndicator';
+  div.innerHTML = '<div class="message-bubble typing-dots"><span></span><span></span><span></span></div>';
+  chatWindow.appendChild(div);
+  chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+async function askQuery(question) {
+  input.value = question;
+  await sendQuery();
+}
+
+async function sendQuery() {
+  const question = input.value.trim();
+  if (!question) return;
+
+  appendMessage('user', question);
+  input.value = '';
+  sendBtn.disabled = true;
+  appendTyping();
+
+  try {
+    const resp = await fetch('/ai/copilot/ask', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question})
+    });
+    const data = await resp.json();
+    document.getElementById('typingIndicator')?.remove();
+    appendMessage('assistant', data.answer || data.error || 'No response received.');
+  } catch (e) {
+    document.getElementById('typingIndicator')?.remove();
+    appendMessage('assistant', 'An error occurred. Please try again.');
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Inventory Forecast{% endblock %}
+{% block page_title %}Inventory Forecast{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('inventory.list_inventory') }}" class="back-link"><i class="bi bi-arrow-left me-1"></i>Inventory</a>
+    <h1 class="page-heading mt-1">Inventory Forecast</h1>
+    <p class="page-subheading">Predicted stockouts based on 30-day consumption trends</p>
+  </div>
+</div>
+
+{% if recommendations %}
+<div class="row g-3">
+  {% for rec in recommendations %}
+  <div class="col-md-6 col-lg-4">
+    <div class="forecast-card {% if rec.urgency == 'critical' %}forecast-critical{% else %}forecast-warning{% endif %}">
+      <div class="forecast-header">
+        <span class="forecast-urgency">
+          {% if rec.urgency == 'critical' %}
+          <i class="bi bi-exclamation-circle-fill text-danger me-1"></i>Critical
+          {% else %}
+          <i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>Warning
+          {% endif %}
+        </span>
+        <span class="lens-tag">{{ rec.lens_type }}</span>
+      </div>
+      <div class="forecast-power">{{ rec.lens_power }}</div>
+      <div class="forecast-meta">
+        <div class="forecast-meta-item">
+          <span class="forecast-meta-label">Coating</span>
+          <span>{{ rec.coating }}</span>
+        </div>
+        <div class="forecast-meta-item">
+          <span class="forecast-meta-label">Index</span>
+          <span>{{ rec.lens_index }}</span>
+        </div>
+      </div>
+      <div class="forecast-stats">
+        <div class="forecast-stat">
+          <div class="forecast-stat-value {% if rec.days_until_stockout <= 5 %}text-danger{% else %}text-warning{% endif %}">
+            {{ rec.days_until_stockout }}
+          </div>
+          <div class="forecast-stat-label">Days until stockout</div>
+        </div>
+        <div class="forecast-stat">
+          <div class="forecast-stat-value">{{ rec.quantity_available }}</div>
+          <div class="forecast-stat-label">Units remaining</div>
+        </div>
+        <div class="forecast-stat">
+          <div class="forecast-stat-value">{{ rec.daily_rate }}</div>
+          <div class="forecast-stat-label">Units / day</div>
+        </div>
+      </div>
+      <div class="forecast-action">
+        <div class="forecast-reorder-label">Suggested Reorder</div>
+        <div class="forecast-reorder-qty">{{ rec.suggested_reorder_qty }} units</div>
+      </div>
+      <form method="post" action="{{ url_for('inventory.restock', inventory_id=rec.inventory_id) }}">
+        <input type="hidden" name="quantity" value="{{ rec.suggested_reorder_qty }}" />
+        <button type="submit" class="btn btn-sm w-100 {% if rec.urgency == 'critical' %}btn-danger{% else %}btn-warning text-dark{% endif %} mt-2">
+          <i class="bi bi-arrow-repeat me-1"></i>Restock {{ rec.suggested_reorder_qty }} Units
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card-panel text-center py-5">
+  <i class="bi bi-check-circle-fill text-success" style="font-size:2.5rem;"></i>
+  <h5 class="mt-3">Inventory looks healthy</h5>
+  <p class="text-muted">No SKUs are projected to stock out within the next 14 days based on current consumption.</p>
+</div>
+{% endif %}
+{% endblock %}

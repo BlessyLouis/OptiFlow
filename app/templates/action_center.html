@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Action Center{% endblock %}
+{% block page_title %}Action Center{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-heading">Action Center</h1>
+    <p class="page-subheading">High-risk orders requiring immediate attention</p>
+  </div>
+  <span class="badge bg-danger px-3 py-2" style="font-size:0.78rem;">{{ enriched | length + remaining | length }} High-Risk Orders</span>
+</div>
+
+{% if not enriched and not remaining %}
+<div class="card-panel text-center py-5">
+  <i class="bi bi-shield-check text-success" style="font-size:2.5rem;"></i>
+  <h5 class="mt-3">No high-risk orders</h5>
+  <p class="text-muted">All active orders are currently within acceptable risk thresholds.</p>
+</div>
+{% else %}
+
+<!-- AI-enriched high risk orders -->
+{% for item in enriched %}
+{% set order = item.order %}
+{% set expl = item.explanation %}
+<div class="action-card">
+  <div class="action-card-header">
+    <div class="d-flex align-items-center gap-3">
+      <a href="{{ url_for('orders.order_detail', order_id=order.order_id) }}" class="action-order-id">
+        {{ order.order_id }}
+      </a>
+      <span class="status-badge status-{{ order.current_status | lower | replace(' ', '-') }}">{{ order.current_status }}</span>
+      <span class="text-muted small">{{ order.customer_name }} · {{ order.store_location }}</span>
+    </div>
+    <div class="action-risk">
+      <span class="{{ order.risk_badge_class }} badge-lg">Risk {{ order.risk_score }}%</span>
+    </div>
+  </div>
+
+  <div class="action-risk-bar mb-3">
+    <div class="risk-bar-track">
+      <div class="risk-bar-fill risk-{{ order.risk_label | lower }}" style="width: {{ order.risk_score }}%"></div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="action-insight">
+        <div class="action-insight-label"><i class="bi bi-info-circle me-1"></i>Why it's at risk</div>
+        <div class="action-insight-text">{{ expl.reason or '—' }}</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="action-insight action-insight-action">
+        <div class="action-insight-label"><i class="bi bi-lightning-charge me-1"></i>Recommended action</div>
+        <div class="action-insight-text fw-medium">{{ expl.recommended_action or '—' }}</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="action-insight">
+        <div class="action-insight-label"><i class="bi bi-graph-up me-1"></i>Expected impact</div>
+        <div class="action-insight-text">{{ expl.expected_impact or '—' }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="action-card-footer">
+    <div class="text-muted small">
+      <span class="me-3"><i class="bi bi-layers me-1"></i>{{ order.lens_type }} · {{ order.prescription_power }}</span>
+      <span class="me-3"><i class="bi bi-exclamation-circle me-1"></i>{{ order.qc_failure_count }} QC failure(s)</span>
+      {% if not order.inventory_available %}<span class="text-danger"><i class="bi bi-x-circle me-1"></i>Lens unavailable</span>{% endif %}
+    </div>
+    <a href="{{ url_for('orders.order_detail', order_id=order.order_id) }}" class="btn btn-sm btn-outline-danger">
+      View Order
+    </a>
+  </div>
+</div>
+{% endfor %}
+
+<!-- Remaining high-risk orders (no AI explanation) -->
+{% if remaining %}
+<div class="card-panel mt-4">
+  <div class="panel-header">
+    <span class="panel-title">Additional High-Risk Orders</span>
+    <span class="text-muted small">{{ remaining | length }} orders</span>
+  </div>
+  <div class="table-responsive">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Customer</th>
+          <th>Lens Type</th>
+          <th>Status</th>
+          <th>Risk</th>
+          <th>Delay Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in remaining %}
+        <tr>
+          <td><a href="{{ url_for('orders.order_detail', order_id=order.order_id) }}" class="order-link">{{ order.order_id }}</a></td>
+          <td>{{ order.customer_name }}</td>
+          <td><span class="lens-tag">{{ order.lens_type }}</span></td>
+          <td><span class="status-badge status-{{ order.current_status | lower | replace(' ', '-') }}">{{ order.current_status }}</span></td>
+          <td><span class="{{ order.risk_badge_class }}">{{ order.risk_score }}%</span></td>
+          <td class="text-muted small">{{ order.delay_reason or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
