@@ -35,7 +35,9 @@
     <a href="{{ url_for('inventory.forecast') }}" class="nav-link {% if request.endpoint == 'inventory.forecast' %}active{% endif %}">
       <i class="bi bi-graph-up-arrow"></i> Forecast
     </a>
-
+    <a href="/ml/metrics" class="nav-link {% if request.endpoint == 'dashboard.ml_metrics' %}active{% endif %}">
+  <i class="bi bi-cpu"></i> ML Metrics
+    </a>
     <div class="nav-section-label mt-3">Intelligence</div>
     <a href="{{ url_for('ai.action_center') }}" class="nav-link {% if request.endpoint == 'ai.action_center' %}active{% endif %}">
       <i class="bi bi-exclamation-triangle"></i> Action Center

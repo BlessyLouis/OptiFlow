@@ -63,3 +63,33 @@ def index():
         status_chart=status_chart,
         now=datetime.utcnow(),
     )
+@bp.route("/ml/metrics")
+def ml_metrics():
+    import joblib
+    import os
+    from app.ml.train_model import generate_training_data
+    from sklearn.metrics import classification_report, confusion_matrix
+    from sklearn.model_selection import train_test_split
+
+    model_path = os.path.join(os.path.dirname(__file__), "../ml/sla_model.pkl")
+    bundle = joblib.load(model_path)
+    model = bundle["model"]
+
+    X, y = generate_training_data(3000)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)[:, 1]
+
+    report = classification_report(y_test, y_pred,
+                target_names=["On Time", "SLA Breach"], output_dict=True)
+    cm = confusion_matrix(y_test, y_pred).tolist()
+
+    feature_names = ["Lens Type", "Inventory Flag", "Order Status", "QC Failures", "Store Location"]
+    importances = list(zip(feature_names, [round(float(i), 4) for i in model.feature_importances_]))
+    importances.sort(key=lambda x: x[1], reverse=True)
+
+    return render_template("ml_metrics.html",
+        report=report, cm=cm, importances=importances,
+        n_estimators=model.n_estimators,
+        max_depth=model.max_depth,
+    )

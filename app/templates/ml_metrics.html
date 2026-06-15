@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}ML Metrics{% endblock %}
+{% block page_title %}ML Metrics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-heading">Random Forest — Model Metrics</h1>
+    <p class="page-subheading">SLA Breach Prediction · {{ n_estimators }} estimators · max depth {{ max_depth }}</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Accuracy cards -->
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-green"><i class="bi bi-bullseye"></i></div>
+      <div class="kpi-value">{{ (report.accuracy * 100) | round(1) }}%</div>
+      <div class="kpi-label">Overall Accuracy</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-blue"><i class="bi bi-shield-check"></i></div>
+      <div class="kpi-value">{{ (report['SLA Breach']['precision'] * 100) | round(1) }}%</div>
+      <div class="kpi-label">Breach Precision</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-yellow"><i class="bi bi-graph-up"></i></div>
+      <div class="kpi-value">{{ (report['SLA Breach']['recall'] * 100) | round(1) }}%</div>
+      <div class="kpi-label">Breach Recall</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card">
+      <div class="kpi-icon kpi-blue"><i class="bi bi-activity"></i></div>
+      <div class="kpi-value">{{ (report['SLA Breach']['f1-score'] * 100) | round(1) }}%</div>
+      <div class="kpi-label">F1 Score</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
+  <!-- Feature Importances -->
+  <div class="col-lg-6">
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">Feature Importances</span></div>
+      <div style="padding: 16px 20px;">
+        {% for name, score in importances %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="small fw-medium">{{ name }}</span>
+            <span class="small text-muted">{{ (score * 100) | round(1) }}%</span>
+          </div>
+          <div class="risk-bar" style="height:8px;">
+            <div class="risk-bar-fill risk-high" style="width:{{ (score * 100) | round(1) }}%; background: #4f46e5;"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Confusion Matrix -->
+  <div class="col-lg-6">
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">Confusion Matrix</span></div>
+      <div style="padding: 20px;">
+        <table class="data-table text-center">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Predicted: On Time</th>
+              <th>Predicted: Breach</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="fw-medium">Actual: On Time</td>
+              <td class="text-success fw-bold">{{ cm[0][0] }}</td>
+              <td class="text-danger">{{ cm[0][1] }}</td>
+            </tr>
+            <tr>
+              <td class="fw-medium">Actual: Breach</td>
+              <td class="text-danger">{{ cm[1][0] }}</td>
+              <td class="text-success fw-bold">{{ cm[1][1] }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="text-muted small mt-3">Green = correct predictions · Red = errors</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full classification report -->
+  <div class="col-12">
+    <div class="card-panel">
+      <div class="panel-header"><span class="panel-title">Full Classification Report</span></div>
+      <div class="table-responsive">
+        <table class="data-table text-center">
+          <thead>
+            <tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1-Score</th><th>Support</th></tr>
+          </thead>
+          <tbody>
+            {% for cls in ['On Time', 'SLA Breach'] %}
+            <tr>
+              <td class="fw-medium">{{ cls }}</td>
+              <td>{{ (report[cls]['precision'] * 100) | round(1) }}%</td>
+              <td>{{ (report[cls]['recall'] * 100) | round(1) }}%</td>
+              <td>{{ (report[cls]['f1-score'] * 100) | round(1) }}%</td>
+              <td>{{ report[cls]['support'] | int }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
