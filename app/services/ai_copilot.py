@@ -9,7 +9,7 @@ from app.utils.constants import ACTIVE_STATUSES
 logger = get_logger(__name__)
 
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama3-8b-8192"
+GROQ_MODEL = "llama-3.1-8b-instant"
 
 
 def _call_groq(prompt: str) -> str:
