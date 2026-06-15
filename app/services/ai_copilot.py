@@ -1,6 +1,6 @@
 import os
-from datetime import datetime, timedelta
-from google import genai
+import requests
+from datetime import datetime
 from app.models.order import Order
 from app.models.inventory import Inventory
 from app.utils.logger import get_logger
@@ -8,12 +8,32 @@ from app.utils.constants import ACTIVE_STATUSES
 
 logger = get_logger(__name__)
 
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL = "llama3-8b-8192"
 
-def _get_client():
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+
+def _call_groq(prompt: str) -> str:
+    api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
         return None
-    return genai.Client(api_key=api_key)
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+    payload = {
+        "model": GROQ_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.4,
+        "max_tokens": 1024,
+    }
+
+    response = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=30)
+
+    if response.status_code != 200:
+        raise Exception(f"Groq API returned {response.status_code}: {response.text[:300]}")
+
+    return response.json()["choices"][0]["message"]["content"]
 
 
 def _build_context_snapshot() -> str:
@@ -67,10 +87,9 @@ TOP STORES BY DELAY COUNT:
 
 
 def answer_copilot_query(user_question: str) -> str:
-    client = _get_client()
-
-    if not client:
-        return "AI Copilot is not configured. Please set the GEMINI_API_KEY environment variable."
+    api_key = os.environ.get("GROQ_API_KEY", "")
+    if not api_key:
+        return "AI Copilot is not configured. Please set the GROQ_API_KEY environment variable."
 
     context = _build_context_snapshot()
 
@@ -79,17 +98,13 @@ You have access to live operational data shown below.
 
 {context}
 
-Answer the following question based strictly on the data above.
-Be concise, specific, and actionable. If the question cannot be answered from the data, say so clearly.
+Answer the following question based on the data above.
+Be concise, specific, and actionable.
 
 User question: {user_question}"""
 
     try:
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-        )
-        return response.text.strip()
+        return _call_groq(prompt).strip()
     except Exception as e:
         logger.error("Copilot query failed: %s", e)
         return f"Copilot error: {str(e)}"
