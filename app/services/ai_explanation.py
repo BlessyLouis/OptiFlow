@@ -1,34 +1,24 @@
 import os
-import google.generativeai as genai
+from google import genai
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-_client_configured = False
 
-
-def _ensure_configured():
-    global _client_configured
-    if not _client_configured:
-        api_key = os.environ.get("GEMINI_API_KEY", "")
-        if api_key:
-            genai.configure(api_key=api_key)
-            _client_configured = True
-        else:
-            logger.warning("GEMINI_API_KEY not set — AI explanations will be unavailable")
+def _get_client():
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        return None
+    return genai.Client(api_key=api_key)
 
 
 def generate_order_explanation(order) -> dict:
-    """
-    Ask Gemini to explain why an order is at risk and what to do about it.
-    Returns a dict with keys: reason, recommended_action, expected_impact.
-    """
-    _ensure_configured()
+    client = _get_client()
 
-    if not _client_configured:
+    if not client:
         return _fallback_explanation(order)
 
-    prompt = f"""You are an operations analyst for an eyewear company. Analyze the following order and provide a concise explanation.
+    prompt = f"""You are an operations analyst for an eyewear company. Analyze this order and explain the risk.
 
 Order ID: {order.order_id}
 Customer: {order.customer_name}
@@ -42,14 +32,16 @@ Inventory Available: {order.inventory_available}
 Risk Score: {order.risk_score}%
 Delay Reason: {order.delay_reason or 'None recorded'}
 
-Respond in exactly this format (no markdown, plain text):
+Respond in exactly this format (plain text, no markdown):
 REASON: [one sentence explaining why the order is at risk]
 ACTION: [one specific recommended action]
 IMPACT: [expected business impact if action is taken]"""
 
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+        )
         return _parse_explanation(response.text)
     except Exception as e:
         logger.error("Gemini explanation failed for order %s: %s", order.order_id, e)
@@ -77,12 +69,12 @@ def _fallback_explanation(order) -> dict:
     if order.current_status in ("QC Failed", "Reorder Generated"):
         reasons.append("order is currently in rework cycle")
 
-    reason = f"Order {order.order_id} is at risk because " + (
+    reason = "Order {} is at risk because {}".format(
+        order.order_id,
         " and ".join(reasons) if reasons else "multiple operational factors are contributing to delay"
     )
-
     return {
         "reason": reason,
         "recommended_action": "Expedite lens procurement and prioritize QC re-inspection.",
-        "expected_impact": "Timely action could reduce delay by 1–2 days and prevent SLA breach.",
+        "expected_impact": "Timely action could reduce delay by 1-2 days and prevent SLA breach.",
     }
